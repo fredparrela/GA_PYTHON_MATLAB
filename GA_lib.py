@@ -110,6 +110,8 @@ def plot_digraph(adjacency_matrix: np.ndarray,names: np.ndarray):
     plt.show()
 
 
+
+
 def dag_to_bit(F1: np.ndarray) ->  np.ndarray:
   """
   Converts a adjacenty matrix to a bit representation.
@@ -182,6 +184,7 @@ def is_dag(matrix :np.ndarray)->(bool, nx.DiGraph):
 
   # Add edges to the graph object.
   for i in range(matrix.shape[0]):
+    G.add_node(i)
     for j in range(matrix.shape[1]):
       if matrix[i, j] == 1:
         G.add_edge(i, j)
@@ -207,22 +210,47 @@ class BayesianNetworkIndividual:
       pandas_dataframe: A Pandas DataFrame containing the data to evaluate the Bayesian network on.
     """
     flag,nx_dag =is_dag(adjacency_matrix)
-    if not flag :
+    #if not flag :
       #raise ValueError("The adjacency matrix is not a DAG. The Bayesian network is not be valid.")
-      warnings.warn("The adjacency matrix is not a DAG. The Bayesian network may not be valid.")
-    #pandas_dataframe.columns
+      #adjacency_matrix=repair_dag(self).toarray()
+      #warnings.warn("The adjacency matrix is not a DAG. The repair operator was called.")
+      #warnings.warn("The adjacency matrix is not a DAG. The Bayesian network may not be valid.")
 
-    #nodes_name_mapping = dict(zip( list(range(adjacency_matrix.shape[0])), pandas_dataframe.columns))
-    #nodes_dic = {}
-    #for node, node_name in zip(list(range(adjacency_matrix.shape[0])), pandas_dataframe.columns):
-    #  nodes_dic[node] = {"labels": node_name}
-    #print(nodes_dic)
-    #my_dict = {0: 'asia', 1: 'tub', 2: 'smoke', 3: 'lung', 4: 'bronc', 5: 'either', 6: 'xray', 7: 'dysp'}
-    #nx.set_node_attributes(nx_dag, nodes_dic)
+    n=adjacency_matrix.shape[0]
+    mask=np.triu(np.ones([n,n]), k=1)
+    rows, cols = np.where(mask)
+    _Index = np.array([rows, cols]).T
+
+
     self.adjacency_matrix = adjacency_matrix
     self.pandas_dataframe = pandas_dataframe
     self.DAG_nx=nx_dag
     self.bit_representation =dag_to_bit(self.adjacency_matrix)
+    self.Index=_Index
+
+    if not flag :
+      #warnings.warn("The adjacency matrix is not a DAG. The repair operator was called.")
+      adjacency_matrix=repair_dag(self).toarray()
+      self.adjacency_matrix = adjacency_matrix
+      self.bit_representation =dag_to_bit(self.adjacency_matrix)
+      flag,nx_dag =is_dag(adjacency_matrix)
+      self.DAG_nx=nx_dag
+      
+
+
+
+  @classmethod
+  def from_bit_representation(cls, bit_representation: np.ndarray, pandas_dataframe: pd.DataFrame,index : np.ndarray):
+        """Alternative constructor based on bit_representation.
+        Args:
+            bit_representation: A NumPy array representing the bit representation of the Bayesian network.
+            pandas_dataframe: A Pandas DataFrame containing the data to evaluate the Bayesian network on.
+
+        Returns:
+            A new BayesianNetworkIndividual object created from the bit_representation.
+        """
+        adjacency_matrix = bit_to_dag(bit_representation,index)
+        return cls(adjacency_matrix, pandas_dataframe)
 
   def evaluate_cost(self):
     """Evaluates the Bayesian network on the given data.
@@ -232,8 +260,9 @@ class BayesianNetworkIndividual:
     """
     names=np.array(self.pandas_dataframe.columns)
     #print(self.adjacency_matrix)
+    self.cost=BIC_score(self.pandas_dataframe, self.adjacency_matrix,names)
     
-    return BIC_score(self.pandas_dataframe, self.adjacency_matrix,names)
+    return self.cost
 
   def crossover(self, other_individual):
     """Crosses over the current individual with the given other individual.
@@ -244,11 +273,30 @@ class BayesianNetworkIndividual:
     Returns:
       A new BayesianNetworkIndividual object that is the result of crossing over the current individual with the given other individual.
     """
+    
+    AA=self.bit_representation
+    BB=other_individual.bit_representation
 
-    new_individual = BayesianNetworkIndividual(
-        crossover_adjacency_matrix(self.adjacency_matrix, other_individual.adjacency_matrix),
-        self.pandas_dataframe.copy())
-    return new_individual
+    # Assuming you have the arrays AA and BB defined
+    # You can replace these with your actual data
+
+    # Generate two random points in the array indices
+    point = np.random.permutation(len(AA))[:2]
+
+
+    point = np.sort(point)
+    
+    # Create aux1 and aux2 based on the points
+    #if(np.random.rand()>0.5):
+    aux1 = np.concatenate((AA[:point[0]], BB[point[0]:point[1]], AA[point[1]:]))
+    #else:
+    aux2 = np.concatenate((BB[:point[0]], AA[point[0]:point[1]], BB[point[1]:]))
+
+    new_individual1=BayesianNetworkIndividual.from_bit_representation(aux1,self.pandas_dataframe,self.Index)
+    new_individual2=BayesianNetworkIndividual.from_bit_representation(aux2,self.pandas_dataframe,self.Index)
+
+
+    return new_individual1,new_individual2
 
   def mutate(self):
     """Mutates the current individual.
@@ -256,10 +304,130 @@ class BayesianNetworkIndividual:
     Returns:
       A new BayesianNetworkIndividual object that is the result of mutating the current individual.
     """
+    aux=self.bit_representation
+    coin = np.random.random()
+    array = []
+    if coin < 1/3:
+        array = np.where(aux == 0)[0]
+    elif coin < 2/3:
+        array = np.where(aux == 1)[0]
+    elif coin > 2/3:
+        array = np.where(aux == -1)[0]
+    #print(array)
 
-    new_individual = BayesianNetworkIndividual(
-        mutate_adjacency_matrix(self.adjacency_matrix), self.pandas_dataframe.copy())
-    return new_individual
+    if np.random.random() > 0.5:
+        if len(array) > 0:
+            mu = np.random.randint(0, len(array))
+            if(mu)>len(array)/4:
+              mu=int(np.floor(len(array)/4))
+            #print(mu)
+        #print(mu)
+            if len(array) > mu:
+                if coin < 1/3:
+                    if(mu>3):
+                        mu = 3
+                        #print(coin < 1/3)
+                bit3 = np.random.choice(array, size=mu, replace=False)
+            else:
+                bit3 = [np.random.randint(1, len(aux) - 1)]    
+        else:
+            if len(array) == 0:
+                bit3 = [np.random.randint(1, len(aux) - 1)]
+            else:
+                bit3 = [np.random.choice(array)]
+
+    else:
+            bit3 = [np.random.randint(0, len(aux) - 1)]
+
+
+        
+
+    #print('Bits: ',bit3)
+    #print('conteudo:', aux[bit3])
+      
+    for bit in bit3:
+        if aux[bit] == 0:
+            old = 0
+            if np.random.random() > 0.5:
+                aux[bit] = 1
+            else:
+                aux[bit] = -1
+        elif aux[bit] == 1:
+            old = 1
+            if np.random.random() > 0.5:
+                aux[bit] = 0
+            else:
+                aux[bit] = -1
+        else:
+            old = -1
+            if np.random.random() > 0.5:
+                aux[bit] = 0
+            else:
+                aux[bit] = 1
+
+        # Converting aux to a DAG and checking if it's valid
+        ajd_m = bit_to_dag(aux, self.Index)
+        flag, dag =is_dag(ajd_m)
+        #print(flag)
+        if not flag:
+            aux[bit] = old
+        self.bit_representation=aux
+
+
+
+  def mutate2(self):
+    """Mutates the current individual.
+
+    Returns:
+      A new BayesianNetworkIndividual object that is the result of mutating the current individual.
+    """
+    aux=self.bit_representation
+
+        # Define the number of elements to sample (n)
+    mu = np.random.choice(len(aux), 1, replace=False)
+
+    if(mu)>len(aux)/4:
+      mu=int(np.floor(len(aux)/4))
+    # Use np.random.choice() to randomly select 'n' indices
+    sampled_indices = np.random.choice(len(aux), mu, replace=False)
+
+    # Get the elements at the sampled indices
+    #sampled_elements = aux[sampled_indices]
+
+    bit3=sampled_indices
+        
+
+    #print('Bits: ',bit3)
+    #print('conteudo:', aux[bit3])
+      
+    for bit in bit3:
+        if aux[bit] == 0:
+            old = 0
+            if np.random.random() > 0.5:
+                aux[bit] = 1
+            else:
+                aux[bit] = -1
+        elif aux[bit] == 1:
+            old = 1
+            if np.random.random() > 0.5:
+                aux[bit] = 0
+            else:
+                aux[bit] = -1
+        else:
+            old = -1
+            if np.random.random() > 0.5:
+                aux[bit] = 0
+            else:
+                aux[bit] = 1
+
+        # Converting aux to a DAG and checking if it's valid
+        ajd_m = bit_to_dag(aux, self.Index)
+        flag, dag =is_dag(ajd_m)
+        #print(flag)
+        if not flag:
+            aux[bit] = old
+        self.bit_representation=aux
+
 
 
 
@@ -283,45 +451,51 @@ def repair_dag(BayesianNetworkIndividual)-> scipy.sparse._csr.csr_array:
   Returns:
     The ajdancency matrix of the repaired dag.
   """
-
+  #improve
   
     # Convert the binary adjacency matrix to a networkx DiGraph.
   G = BayesianNetworkIndividual.DAG_nx
     # While the DAG is not acyclic, remove a random edge.
   while not nx.is_directed_acyclic_graph(G):
       # Find all cycles in the DAG.
-      len_cycles=len(sorted(nx.simple_cycles(G)))
-      cycles=list(nx.simple_cycles(G))
-      k = np.random.randint(0, (len_cycles)) 
+      #len_cycles=len(sorted(nx.simple_cycles(G)))
+      cycles=sorted(nx.simple_cycles(G), key=lambda x: len(x))
+      #print(cycles)
+      #print("\n")
+      k =0
       cycle = cycles[k]
       len_cycle=cycle
-      print(len_cycle)
+      #print(len_cycle)
       if len(len_cycle)<2:
           # Remove the edge from the cycle.
           G.remove_edge(cycle[0],cycle[0])
-          print('<2')
-          print((cycle[0],cycle[0]))
+          #print('<2')
+          #print((cycle[0],cycle[0]))
           
       else:
           if len(len_cycle)==2:
               # Remove the edge from the cycle.
               G.remove_edge(cycle[0],cycle[1])
-              print('=2')
-              print(cycle[0],cycle[1])
+              #print('=2')
+              #print(cycle[0],cycle[1])
               
           else:
+              #G.remove_edge(cycle[-1],cycle[0])
+              #k = np.random.randint(0, len(len_cycle)-1)
               
-              k = np.random.randint(0, len(len_cycle))
-              
-              j=k
-              while j == k:
-                  j = np.random.randint(0, len(len_cycle))
-              print('>2')
+              #j=k+1
+              #while j == k:
+              #    j = np.random.randint(0, len(len_cycle))
+              #print('>2')
               
               # Remove the edge from the cycle.
-              if G.has_edge(cycle[j], cycle[k]):
-                print(cycle[j],cycle[k])
-                G.remove_edge(cycle[j],cycle[k])
+              #print(G.has_edge(cycle[k], cycle[j]))
+              #print((cycle))
+              #if G.has_edge(cycle[-1], cycle[0]):
+                #print(cycle[j],cycle[k])
+              G.remove_edge(cycle[-1],cycle[0])
+              #G.remove_edges_from(cycle)
+              #print((cycle))
 
       
   
