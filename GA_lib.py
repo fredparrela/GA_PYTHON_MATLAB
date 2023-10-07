@@ -192,9 +192,9 @@ def is_dag(matrix :np.ndarray)->(bool, nx.DiGraph):
 
   
   # Check if the NetworkX graph is a DAG.
-  is_dag = nx.is_directed_acyclic_graph(G)
+  is_dag_0 = nx.is_directed_acyclic_graph(G)
 
-  return is_dag,G
+  return is_dag_0,G
 
 
 
@@ -370,8 +370,18 @@ class BayesianNetworkIndividual:
         flag, dag =is_dag(ajd_m)
         #print(flag)
         if not flag:
-            aux[bit] = old
-        self.bit_representation=aux
+            aux[bit] = 0
+
+    #print('Bits depois: ',bit3)
+    #print('conteudo depois :', aux[bit3])
+    ajd_m = bit_to_dag(aux, self.Index)
+    flag, dag =is_dag(ajd_m)
+    if not flag:
+      print('NOT A DAG')
+    #self=self.from_bit_representation(aux,self.pandas_dataframe,self.Index)
+    self.DAG_nx=dag
+    self.bit_representation=aux
+    self.adjacency_matrix=ajd_m
 
 
 
@@ -397,8 +407,8 @@ class BayesianNetworkIndividual:
     bit3=sampled_indices
         
 
-    #print('Bits: ',bit3)
-    #print('conteudo:', aux[bit3])
+    print('Bits mutate 2: ',bit3)
+    print('conteudo mutate 2:', aux[bit3])
       
     for bit in bit3:
         if aux[bit] == 0:
@@ -426,6 +436,8 @@ class BayesianNetworkIndividual:
         #print(flag)
         if not flag:
             aux[bit] = old
+        print('Bits depois mutate 2: ',bit3)
+        print('conteudo depois mutate 2 :', aux[bit3])
         self.bit_representation=aux
 
 
