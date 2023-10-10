@@ -4,6 +4,32 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import scipy
 import warnings
+from sympy import primerange
+
+data=pd.read_csv("ASIA_DATA.csv")
+dag_true=pd.read_csv("DAGtrue_ASIA.csv")
+column_indices = np.random.permutation(data.columns)
+N_samples=5000
+data_sampled=data.sample(N_samples)
+data_sampled=data_sampled.astype('category')
+data_sampled = data_sampled[column_indices]
+
+
+
+my_dict_global={}
+prime_list = list(primerange(1, 7920))  # The range [1, 7920] contains the first 1000 primes
+
+
+
+def my_dic_inti (data):
+    # Generate the first 1000 prime numbers
+    my_dict = {}
+    for index,content in enumerate(data.columns):
+        #print(index, content)
+        my_dict[content] = index
+    return my_dict
+
+my_dict=my_dic_inti(data_sampled)
 
 
 def state_count(data: pd.DataFrame, adjacency_matrix: np.ndarray, node: int, node_names: np.ndarray) -> pd.DataFrame:
@@ -42,16 +68,34 @@ def BIC_score(data: pd.DataFrame, adjacency_matrix: np.ndarray, node_names: np.n
     Returns:
     BIC scored of the DAG
     """
+    #print(my_dict_global)
     n=np.shape(adjacency_matrix)[0]
     obs=data.shape[0]
     Bn_size=0
-    bic=0
+    acc=0
     for node in range(n):
-        states=state_count(data,adjacency_matrix,node,node_names)
-        A=len(states.iloc[:,-2].unique())
-        B=len(states)
-        Bn_size=(B/A)*(A-1)+Bn_size
-        #acc=0
+      #print(acc)
+      bic=0
+      states=state_count(data,adjacency_matrix,node,node_names)
+      #print(list(states.columns))
+      teste=np.array(states.columns[:-1])
+      key=1
+      #print(teste)
+      if(len(teste)==1):
+        key=prime_list[my_dict[teste[0]]+2*n]
+      else:
+        aux=teste[:-1]
+      #np.random.shuffle(aux)
+        for _ ,name in enumerate(aux):
+            #print(name)
+            key=key*prime_list[my_dict[name]]
+        key=key*prime_list[my_dict[teste[-1]]+2*n]
+      #print(key)
+      #print(states)
+      A=len(states.iloc[:,-2].unique())
+      B=len(states)
+      Bn_size=(B/A)*(A-1)+Bn_size
+      if key not in  my_dict_global:
         count=0
         count2=0
         for i in range(int(B/A)):
@@ -66,11 +110,19 @@ def BIC_score(data: pd.DataFrame, adjacency_matrix: np.ndarray, node_names: np.n
                         bic=bic+0
                     #print("entrei 2")
                     else:
-                        bic=bic+states.loc[count,'Count']*np.log(states.loc[count,'Count']/states.loc[count2:A+count2-1,'Count'].sum())
+                        bic=bic + states.loc[count,'Count']*np.log(states.loc[count,'Count']/states.loc[count2:A+count2-1,'Count'].sum())
+                        #print("BIC:",bic)
                 count=count+1
             count2=count2+A
+        #print("bic",bic)
+        my_dict_global[key]=bic
+        #print("dic",my_dict_global[key])
+      
+      acc=acc+ my_dict_global[key]
+    #print(Bn_size)
+      
 
-    return bic -0.5*np.log(obs)*Bn_size
+    return acc -0.5*np.log(obs)*Bn_size
 
 
 
