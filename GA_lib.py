@@ -3,7 +3,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 import scipy
-import warnings
+#import warnings
 from sympy import primerange
 
 data=pd.read_csv("ASIA_DATA.csv")
@@ -103,12 +103,14 @@ def BIC_score(data: pd.DataFrame, adjacency_matrix: np.ndarray, node_names: np.n
                 #print(states.loc[count,'Count'])
             
                 if states.loc[count2:A+count2-1,'Count'].sum()==0:
-                    bic =0+bic
-                    #print("entrei")
+                    states.loc[count2:A+count2-1,'Count']=1
+                    bic=bic + states.loc[count,'Count']*np.log(states.loc[count,'Count']/states.loc[count2:A+count2-1,'Count'].sum())
+                    #bic =0+bic
+                    #print(states)
                 else:
                     if(states.loc[count,'Count']==0):
                         bic=bic+0
-                    #print("entrei 2")
+                        #print(states)
                     else:
                         bic=bic + states.loc[count,'Count']*np.log(states.loc[count,'Count']/states.loc[count2:A+count2-1,'Count'].sum())
                         #print("BIC:",bic)
@@ -193,7 +195,7 @@ def bit_to_dag(bit_represent: np.ndarray,index : np.ndarray )->  np.ndarray:
   Args:
     bit_represent: A 1D NumPy array containing the bit representation of the DAG.
     n: The number of nodes in the DAG.
-    index: 
+    index: A 2D NumPy array containing pairs of indices representing edges in the DAG. 
 
   Returns:
     A 2D NumPy array containing the DAG matrix.
@@ -367,7 +369,7 @@ class BayesianNetworkIndividual:
         array = np.where(aux == -1)[0]
     #print(array)
 
-    if np.random.random() > 0.5:
+    if np.random.random() > 0.9:
         if len(array) > 0:
             mu = np.random.randint(0, len(array))
             if(mu)>len(array)/4:
@@ -391,8 +393,10 @@ class BayesianNetworkIndividual:
     else:
             bit3 = [np.random.randint(0, len(aux) - 1)]
 
-
-        
+    if(len(bit3)>10):
+        selected_indices = np.random.choice(len(bit3), 10, replace=False).tolist()
+        bit3=bit3[selected_indices]
+        print('Bits: ',bit3)
 
     #print('Bits: ',bit3)
     #print('conteudo:', aux[bit3])
